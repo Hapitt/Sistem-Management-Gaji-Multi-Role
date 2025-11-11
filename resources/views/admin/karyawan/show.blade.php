@@ -31,9 +31,10 @@
             <!-- Foto Profil Sidebar -->
             <div class="lg:col-span-1 bg-gradient-to-b from-blue-600 to-blue-700 text-white p-8 flex flex-col items-center justify-center">
                 <div class="relative mb-6">
-                    <img src="{{ $karyawan->foto ? asset('storage/'.$karyawan->foto) : asset('images/default-avatar.png') }}"
-                         alt="Foto {{ $karyawan->nama }}"
-                         class="w-40 h-40 rounded-full border-4 border-white shadow-lg object-cover">
+                    <img src="{{ asset('storage/'.$karyawan->foto) }}"
+                        alt="Foto {{ $karyawan->nama }}"
+                        class="w-40 h-40 rounded-full border-4 border-white shadow-lg object-cover">
+
                     
                     <!-- Status Badge -->
                     <div class="absolute -top-2 -right-2">
