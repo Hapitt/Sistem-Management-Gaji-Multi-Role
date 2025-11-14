@@ -69,4 +69,45 @@ class User extends Authenticatable
     {
         return $this->hasOne(Karyawan::class, 'user_id', 'id');
     }
+
+    // Tambahkan method untuk mendapatkan divisi manager
+    public function getDivisiManager()
+    {
+        // Jika user adalah manager dan memiliki data karyawan terkait
+        if ($this->role === 'manager' && $this->karyawan) {
+            return $this->karyawan->divisi;
+        }
+
+        return null;
+    }
+
+    // Method untuk mengecek apakah user bisa mengakses data divisi tertentu
+    public function canAccessDivisi($divisi)
+    {
+        if ($this->role === 'admin') {
+            return true;
+        }
+
+        if ($this->role === 'manager') {
+            return $this->getDivisiManager() === $divisi;
+        }
+
+        return false;
+    }
+
+    // Method untuk mendapatkan karyawan yang se-divisi (untuk manager)
+    public function getKaryawanSeDivisi()
+    {
+        if ($this->role !== 'manager') {
+            return collect();
+        }
+
+        $divisiManager = $this->getDivisiManager();
+        if (!$divisiManager) {
+            return collect();
+        }
+
+        return Karyawan::where('divisi', $divisiManager)->get();
+    }
 }
+

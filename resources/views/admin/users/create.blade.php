@@ -201,6 +201,7 @@
                                     <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
+                                    Untuk role <strong>Karyawan</strong> dan <strong>Manager</strong>, wajib memilih karyawan yang terkait.
                                     Hanya menampilkan karyawan yang belum memiliki akun user.
                                 </p>
                                 @error('karyawan_id')
@@ -308,13 +309,14 @@ function toggleKaryawanSelect() {
     const karyawanContainer = document.getElementById('karyawan-select-container');
     const karyawanSelect = document.getElementById('karyawan_id');
     
-    if (roleSelect.value === 'karyawan') {
+
+    if (roleSelect.value === 'karyawan' || roleSelect.value === 'manager') {
         karyawanContainer.classList.remove('hidden');
         karyawanSelect.required = true;
     } else {
         karyawanContainer.classList.add('hidden');
         karyawanSelect.required = false;
-        karyawanSelect.value = ''; // Reset selection
+        karyawanSelect.value = ''; 
     }
 }
 
@@ -344,10 +346,10 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Validasi jika role karyawan harus memilih karyawan
-        if (role === 'karyawan' && !karyawanId) {
+        // Validasi jika role karyawan ATAU manager harus memilih karyawan
+        if ((role === 'karyawan' || role === 'manager') && !karyawanId) {
             e.preventDefault();
-            alert('Untuk role Karyawan, wajib memilih karyawan yang terkait!');
+            alert('Untuk role Karyawan dan Manager, wajib memilih karyawan yang terkait!');
             return;
         }
     });

@@ -61,15 +61,15 @@ class UserController extends Controller
             'foto' => ['nullable', 'image', 'max:2048'],
         ];
 
-        // Jika role karyawan, karyawan_id wajib diisi
-        if ($request->role === 'karyawan') {
+        // Jika role karyawan ATAU manager, karyawan_id wajib diisi
+        if ($request->role === 'karyawan' || $request->role === 'manager') {
             $rules['karyawan_id'] = ['required', 'exists:karyawan,id_karyawan'];
         }
 
         $request->validate($rules);
 
         // Validasi tambahan: cek apakah karyawan sudah memiliki user
-        if ($request->role === 'karyawan' && $request->filled('karyawan_id')) {
+        if (($request->role === 'karyawan' || $request->role === 'manager') && $request->filled('karyawan_id')) {
             $karyawan = Karyawan::find($request->karyawan_id);
 
             if (!$karyawan) {
@@ -100,8 +100,8 @@ class UserController extends Controller
         // Buat user
         $user = User::create($userData);
 
-        // Jika role karyawan, update karyawan dengan user_id
-        if ($request->role === 'karyawan' && $request->filled('karyawan_id')) {
+        // Jika role karyawan atau manager, update karyawan dengan user_id
+        if (($request->role === 'karyawan' || $request->role === 'manager') && $request->filled('karyawan_id')) {
             Karyawan::where('id_karyawan', $request->karyawan_id)
                 ->update(['user_id' => $user->id]);
         }
@@ -146,15 +146,15 @@ class UserController extends Controller
             'foto' => ['nullable', 'image', 'max:2048'],
         ];
 
-        // Jika role karyawan, karyawan_id wajib diisi
-        if ($request->role === 'karyawan') {
+        // Jika role karyawan ATAU manager, karyawan_id wajib diisi
+        if ($request->role === 'karyawan' || $request->role === 'manager') {
             $rules['karyawan_id'] = ['required', 'exists:karyawan,id_karyawan'];
         }
 
         $request->validate($rules);
 
         // Validasi tambahan: cek apakah karyawan sudah memiliki user lain
-        if ($request->role === 'karyawan' && $request->filled('karyawan_id')) {
+        if (($request->role === 'karyawan' || $request->role === 'manager') && $request->filled('karyawan_id')) {
             $karyawan = Karyawan::find($request->karyawan_id);
 
             if (!$karyawan) {
@@ -194,7 +194,7 @@ class UserController extends Controller
         // Handle perubahan karyawan relation
         $oldKaryawan = $user->karyawan;
 
-        if ($request->role === 'karyawan' && $request->filled('karyawan_id')) {
+        if (($request->role === 'karyawan' || $request->role === 'manager') && $request->filled('karyawan_id')) {
             // Jika user sudah punya karyawan sebelumnya dan berbeda, lepas hubungan lama
             if ($oldKaryawan && $oldKaryawan->id_karyawan != $request->karyawan_id) {
                 Karyawan::where('id_karyawan', $oldKaryawan->id_karyawan)
@@ -205,7 +205,7 @@ class UserController extends Controller
             Karyawan::where('id_karyawan', $request->karyawan_id)
                 ->update(['user_id' => $user->id]);
         } else {
-            // Jika role bukan karyawan, lepas semua hubungan
+            // Jika role bukan karyawan/manager, lepas semua hubungan
             if ($oldKaryawan) {
                 Karyawan::where('id_karyawan', $oldKaryawan->id_karyawan)
                     ->update(['user_id' => null]);

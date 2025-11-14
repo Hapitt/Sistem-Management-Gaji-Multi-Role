@@ -10,6 +10,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Exception;
 
 class GajiController extends Controller
 {
@@ -21,26 +24,40 @@ class GajiController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $periode = $request->input('periode');
+        $periode = $request->input('periode'); // expect format YYYY-MM or YYYY-MM-DD
         $filterSerah = $request->input('serah');
 
-        // Ambil divisi manager yang sedang login
+        // Ambil divisi manager yang sedang login (pakai optional agar tidak error)
         $user = Auth::user();
-        $managerDivisi = $user->karyawan->divisi ?? null;
+        $managerDivisi = optional($user->karyawan)->divisi;
+
+        // Jika manager belum punya data karyawan, tampilkan kosong (atau bisa redirect dengan pesan)
+        if (!$managerDivisi) {
+            $gaji = Gaji::whereRaw('0 = 1')->paginate(10); // kosong
+            return view('manager.gaji.index', compact('gaji', 'search', 'periode', 'filterSerah', 'managerDivisi'));
+        }
 
         $gaji = Gaji::with(['karyawan', 'lembur'])
-            ->whereHas('karyawan', function ($query) use ($managerDivisi) {
-                $query->where('divisi', $managerDivisi);
+            ->whereHas('karyawan', function ($q) use ($managerDivisi) {
+                $q->where('divisi', $managerDivisi);
             })
-            ->when($search, fn($q) => $q->whereHas('karyawan', fn($qq) => $qq->where('nama', 'like', "%{$search}%")))
-            ->when($periode, function ($query, $periode) {
-                // Konversi format periode dari YYYY-MM menjadi YYYY-MM-01 untuk filtering
-                $periodeDate = $periode . '-01';
-                $bulan = date('m', strtotime($periodeDate));
-                $tahun = date('Y', strtotime($periodeDate));
-                $query->whereMonth('periode', $bulan)->whereYear('periode', $tahun);
+            ->when($search, function ($q) use ($search) {
+                $q->whereHas('karyawan', function ($qq) use ($search) {
+                    $qq->where('nama', 'like', "%{$search}%");
+                });
             })
-            ->when($filterSerah, fn($q) => $q->where('serahkan', $filterSerah))
+            ->when($periode, function ($q) use ($periode) {
+                // dukung input yyyy-mm atau yyyy-mm-dd
+                try {
+                    $dt = Carbon::parse(strlen($periode) === 7 ? $periode . '-01' : $periode);
+                    $q->whereMonth('periode', $dt->month)->whereYear('periode', $dt->year);
+                } catch (\Exception $e) {
+                    // jika parse gagal, abaikan filter periode
+                }
+            })
+            ->when($filterSerah, function ($q) use ($filterSerah) {
+                $q->where('serahkan', $filterSerah);
+            })
             ->orderBy('id_gaji', 'desc')
             ->paginate(10);
 
@@ -51,11 +68,10 @@ class GajiController extends Controller
     {
         $gaji = Gaji::with(['karyawan.jabatan', 'karyawan.rating', 'lembur'])->findOrFail($id);
 
-        // Cek apakah gaji ini milik karyawan di divisi manager
         $user = Auth::user();
-        $managerDivisi = $user->karyawan->divisi ?? null;
+        $managerDivisi = optional($user->karyawan)->divisi;
 
-        if ($gaji->karyawan->divisi !== $managerDivisi) {
+        if (!$managerDivisi || $gaji->karyawan->divisi !== $managerDivisi) {
             abort(403, 'Anda tidak memiliki akses ke data gaji ini.');
         }
 
@@ -64,14 +80,17 @@ class GajiController extends Controller
 
     public function calculate()
     {
-        // Ambil divisi manager yang sedang login
         $user = Auth::user();
-        $managerDivisi = $user->karyawan->divisi ?? null;
-        $managerId = $user->karyawan->id_karyawan ?? null;
+        $managerDivisi = optional($user->karyawan)->divisi;
+        $managerId = optional($user->karyawan)->id_karyawan;
 
-        // Ambil karyawan yang divisinya sama dengan manager, kecuali manager sendiri
+        if (!$managerDivisi) {
+            return redirect()->route('manager.gaji.index')->with('error', 'Anda belum terhubung ke data karyawan. Hubungi admin.');
+        }
+
+        // Ambil karyawan se-divisi, kecuali manager sendiri
         $karyawan = Karyawan::where('divisi', $managerDivisi)
-            ->where('id_karyawan', '!=', $managerId) // Tidak bisa memasukkan gaji sendiri
+            ->when($managerId, fn($q) => $q->where('id_karyawan', '!=', $managerId))
             ->get();
 
         $lembur = Lembur::all();
@@ -84,85 +103,99 @@ class GajiController extends Controller
         $request->validate([
             'id_karyawan' => 'required|exists:karyawan,id_karyawan',
             'id_lembur' => 'required|exists:lembur,id_lembur',
-            'periode' => 'required|date',
+            'periode' => 'required', // we will parse below
             'lama_lembur' => 'required|integer|min:0',
         ]);
 
-        // Cek apakah karyawan berada di divisi yang sama dengan manager
-        $karyawan = Karyawan::findOrFail($request->id_karyawan);
         $user = Auth::user();
-        $managerDivisi = $user->karyawan->divisi ?? null;
+        $managerDivisi = optional($user->karyawan)->divisi;
+        $managerId = optional($user->karyawan)->id_karyawan;
 
-        if ($karyawan->divisi !== $managerDivisi) {
-            return back()->withInput()->withErrors(['id_karyawan' => 'Anda hanya dapat menambah gaji untuk karyawan di divisi ' . $managerDivisi]);
+        $karyawan = Karyawan::findOrFail($request->id_karyawan);
+
+        if (!$managerDivisi || $karyawan->divisi !== $managerDivisi) {
+            return back()->withInput()->withErrors(['id_karyawan' => 'Anda hanya dapat menambah gaji untuk karyawan di divisi ' . ($managerDivisi ?? 'tidak diketahui')]);
         }
 
-        // Cek apakah manager mencoba menambah gaji sendiri
-        $managerId = $user->karyawan->id_karyawan ?? null;
-        if ($request->id_karyawan == $managerId) {
+        if ($managerId && $request->id_karyawan == $managerId) {
             return back()->withInput()->withErrors(['id_karyawan' => 'Anda tidak dapat menambah gaji untuk diri sendiri.']);
         }
 
-        // Konversi format periode dari YYYY-MM menjadi YYYY-MM-01 (tanggal pertama bulan)
-        $periode = $request->periode . '-01';
+        // Parse periode ke Carbon dan ambil month/year
+        try {
+            $periodeInput = $request->periode;
+            $dt = Carbon::parse(strlen($periodeInput) === 7 ? $periodeInput . '-01' : $periodeInput);
+        } catch (\Exception $e) {
+            return back()->withInput()->withErrors(['periode' => 'Format periode tidak valid. Gunakan YYYY-MM.']);
+        }
 
-        // Cek apakah sudah ada gaji untuk karyawan dan periode yang sama
+        // cek apakah sudah ada gaji di bulan & tahun yang sama
         $exists = Gaji::where('id_karyawan', $request->id_karyawan)
-            ->whereDate('periode', $periode)
+            ->whereMonth('periode', $dt->month)
+            ->whereYear('periode', $dt->year)
             ->exists();
 
         if ($exists) {
             return back()->withInput()->withErrors(['periode' => 'Gaji untuk karyawan dan periode yang sama sudah ada.']);
         }
 
-        // Hitung gaji
-        $karyawanData = DB::table('karyawan')
-            ->join('jabatan', 'karyawan.id_jabatan', '=', 'jabatan.id_jabatan')
-            ->join('rating', 'karyawan.id_rating', '=', 'rating.id_rating')
-            ->where('karyawan.id_karyawan', $request->id_karyawan)
-            ->select('jabatan.gaji_pokok', 'jabatan.tunjangan', 'rating.presentase_bonus')
-            ->first();
+        DB::beginTransaction();
+        try {
+            // ambil data jabatan + rating via query join
+            $karyawanData = DB::table('karyawan')
+                ->join('jabatan', 'karyawan.id_jabatan', '=', 'jabatan.id_jabatan')
+                ->join('rating', 'karyawan.id_rating', '=', 'rating.id_rating')
+                ->where('karyawan.id_karyawan', $request->id_karyawan)
+                ->select('jabatan.gaji_pokok', 'jabatan.tunjangan', 'rating.presentase_bonus')
+                ->first();
 
-        $lembur = DB::table('lembur')->where('id_lembur', $request->id_lembur)->first();
+            $lembur = DB::table('lembur')->where('id_lembur', $request->id_lembur)->first();
 
-        if (!$karyawanData || !$lembur) {
-            return back()->withErrors(['msg' => 'Data karyawan atau lembur tidak ditemukan.']);
+            if (!$karyawanData || !$lembur) {
+                DB::rollBack();
+                return back()->withErrors(['msg' => 'Data karyawan atau tarif lembur tidak ditemukan.']);
+            }
+
+            $gaji_pokok = $karyawanData->gaji_pokok;
+            $tunjangan = $karyawanData->tunjangan;
+            $presentase_bonus = $karyawanData->presentase_bonus;
+            $tarif_lembur = $lembur->tarif;
+
+            $total_lembur = $request->lama_lembur * $tarif_lembur;
+            $total_bonus = $gaji_pokok * $presentase_bonus;
+            $total_tunjangan = $tunjangan;
+            $total_pendapatan = $gaji_pokok + $total_lembur + $total_bonus + $total_tunjangan;
+
+            // simpan, set periode sebagai first day of month
+            Gaji::create([
+                'id_karyawan' => $request->id_karyawan,
+                'id_lembur' => $request->id_lembur,
+                'lama_lembur' => $request->lama_lembur,
+                'periode' => $dt->startOfMonth()->toDateString(),
+                'total_lembur' => $total_lembur,
+                'total_bonus' => $total_bonus,
+                'total_tunjangan' => $total_tunjangan,
+                'total_pendapatan' => $total_pendapatan,
+                'serahkan' => 'belum',
+            ]);
+
+            DB::commit();
+            return redirect()->route('manager.gaji.index')->with('success', 'Gaji berhasil dihitung dan disimpan.');
+        } catch (Exception $e) {
+            DB::rollBack();
+            Log::error('Gaji store error: ' . $e->getMessage());
+            return back()->withInput()->withErrors(['msg' => 'Terjadi kesalahan saat menyimpan gaji.']);
         }
-
-        $gaji_pokok = $karyawanData->gaji_pokok;
-        $tunjangan = $karyawanData->tunjangan;
-        $presentase_bonus = $karyawanData->presentase_bonus;
-        $tarif_lembur = $lembur->tarif;
-
-        $total_lembur = $request->lama_lembur * $tarif_lembur;
-        $total_bonus = $gaji_pokok * $presentase_bonus;
-        $total_tunjangan = $tunjangan;
-        $total_pendapatan = $gaji_pokok + $total_lembur + $total_bonus + $total_tunjangan;
-
-        Gaji::create([
-            'id_karyawan' => $request->id_karyawan,
-            'id_lembur' => $request->id_lembur,
-            'lama_lembur' => $request->lama_lembur,
-            'periode' => $periode, // Gunakan periode yang sudah dikonversi
-            'total_lembur' => $total_lembur,
-            'total_bonus' => $total_bonus,
-            'total_tunjangan' => $total_tunjangan,
-            'total_pendapatan' => $total_pendapatan,
-            'serahkan' => 'belum',
-        ]);
-
-        return redirect()->route('manager.gaji.index')->with('success', 'Gaji berhasil dihitung dan disimpan.');
     }
 
     public function cetak($id)
     {
         $gaji = Gaji::with(['karyawan', 'lembur'])->findOrFail($id);
 
-        // Cek apakah gaji ini milik karyawan di divisi manager
         $user = Auth::user();
-        $managerDivisi = $user->karyawan->divisi ?? null;
+        $managerDivisi = optional($user->karyawan)->divisi;
 
-        if ($gaji->karyawan->divisi !== $managerDivisi) {
+        if (!$managerDivisi || $gaji->karyawan->divisi !== $managerDivisi) {
             abort(403, 'Anda tidak memiliki akses ke data gaji ini.');
         }
 
@@ -175,45 +208,41 @@ class GajiController extends Controller
 
         $pdf = Pdf::loadView('manager.gaji.cetak', compact('gaji', 'karyawan'))->setPaper('A4', 'portrait');
 
-        return $pdf->download('Struk_Gaji_' . $karyawan->nama . '.pdf');
+        return $pdf->download('Struk_Gaji_' . ($karyawan->nama ?? 'gaji') . '.pdf');
     }
 
     public function checkPeriod(Request $request)
     {
-        try {
-            $validated = $request->validate([
-                'karyawan_id' => 'required|exists:karyawan,id_karyawan',
-                'periode' => 'required|date',
-            ]);
+        $validated = $request->validate([
+            'karyawan_id' => 'required|exists:karyawan,id_karyawan',
+            'periode' => 'required',
+        ]);
 
-            // Cek apakah karyawan berada di divisi yang sama dengan manager
-            $karyawan = Karyawan::findOrFail($validated['karyawan_id']);
-            $user = Auth::user();
-            $managerDivisi = $user->karyawan->divisi ?? null;
+        $karyawan = Karyawan::findOrFail($validated['karyawan_id']);
+        $user = Auth::user();
+        $managerDivisi = optional($user->karyawan)->divisi;
 
-            if ($karyawan->divisi !== $managerDivisi) {
-                return response()->json([
-                    'exists' => false,
-                    'message' => 'Anda tidak memiliki akses ke karyawan ini'
-                ], 403);
-            }
-
-            // Konversi format periode dari YYYY-MM menjadi YYYY-MM-01
-            $periode = $validated['periode'] . '-01';
-
-            $exists = Gaji::where('id_karyawan', $validated['karyawan_id'])
-                ->whereDate('periode', $periode)
-                ->exists();
-
-            return response()->json([
-                'exists' => $exists,
-                'message' => $exists ? 'Gaji untuk periode ini sudah ada' : 'Periode tersedia'
-            ]);
-        } catch (\Exception $e) {
+        if (!$managerDivisi || $karyawan->divisi !== $managerDivisi) {
             return response()->json([
                 'exists' => false,
-                'message' => 'Error memeriksa periode'
-            ], 500);
+                'message' => 'Anda tidak memiliki akses ke karyawan ini'
+            ], 403);
         }
+
+        try {
+            $dt = Carbon::parse(strlen($validated['periode']) === 7 ? $validated['periode'] . '-01' : $validated['periode']);
+        } catch (\Exception $e) {
+            return response()->json(['exists' => false, 'message' => 'Format periode tidak valid'], 422);
+        }
+
+        $exists = Gaji::where('id_karyawan', $validated['karyawan_id'])
+            ->whereMonth('periode', $dt->month)
+            ->whereYear('periode', $dt->year)
+            ->exists();
+
+        return response()->json([
+            'exists' => $exists,
+            'message' => $exists ? 'Gaji untuk periode ini sudah ada' : 'Periode tersedia'
+        ]);
     }
 }
