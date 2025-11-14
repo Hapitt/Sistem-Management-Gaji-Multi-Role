@@ -24,7 +24,7 @@ class ProfileController extends Controller
 
     public function update(Request $request)
     {
-        // Ambil user langsung dari model User, bukan Auth::user()
+        
         $user = User::findOrFail(Auth::id());
 
         $request->validate([
@@ -42,7 +42,7 @@ class ProfileController extends Controller
         }
 
         if ($request->hasFile('foto')) {
-            // Hapus foto lama jika ada
+            
             if ($user->foto && Storage::disk('public')->exists($user->foto)) {
                 Storage::disk('public')->delete($user->foto);
             }

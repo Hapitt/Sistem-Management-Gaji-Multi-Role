@@ -26,25 +26,25 @@ class Karyawan extends Model
         'foto',
     ];
 
-    // Relasi ke User
+    
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
 
-    // Relasi ke Jabatan
+    
     public function jabatan()
     {
         return $this->belongsTo(Jabatan::class, 'id_jabatan', 'id_jabatan');
     }
 
-    // Relasi ke Rating
+    
     public function rating()
     {
         return $this->belongsTo(Rating::class, 'id_rating', 'id_rating');
     }
 
-    // Relasi ke Gaji
+    
     public function gaji()
     {
         return $this->hasMany(Gaji::class, 'id_karyawan', 'id_karyawan');

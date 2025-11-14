@@ -64,7 +64,7 @@ class KaryawanController extends Controller
             $validated['foto'] = $request->file('foto')->store('uploads/karyawan', 'public');
         }
 
-        // validasi unik user_id: pastikan user belum terkait ke karyawan lain
+        
         if (!empty($validated['user_id'])) {
             $exists = Karyawan::where('user_id', $validated['user_id'])->exists();
             if ($exists) {

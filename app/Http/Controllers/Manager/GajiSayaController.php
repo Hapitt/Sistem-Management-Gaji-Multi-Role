@@ -21,7 +21,7 @@ class GajiSayaController extends Controller
         $search = $request->input('search');
         $periode = $request->input('periode');
 
-        // Ambil id_karyawan manager yang login
+        
         $managerId = optional(Auth::user()->karyawan)->id_karyawan;
 
         if (!$managerId) {
@@ -33,7 +33,7 @@ class GajiSayaController extends Controller
             ->where('id_karyawan', $managerId)
             ->where('serahkan', 'sudah')
             ->when($search, function ($query) use ($search) {
-                // cari di nama karyawan juga mungkin
+                
                 $query->whereHas('karyawan', function ($q) use ($search) {
                     $q->where('nama', 'like', "%{$search}%");
                 })->orWhere('periode', 'like', "%{$search}%");
@@ -43,7 +43,7 @@ class GajiSayaController extends Controller
                     $dt = Carbon::parse(strlen($periode) === 7 ? $periode . '-01' : $periode);
                     $query->whereMonth('periode', $dt->month)->whereYear('periode', $dt->year);
                 } catch (\Exception $e) {
-                    // abaikan filter jika gagal parse
+                    
                 }
             })
             ->orderBy('periode', 'desc')

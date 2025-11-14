@@ -23,7 +23,7 @@ class Gaji extends Model
         'total_tunjangan',
         'total_pendapatan',
         'serahkan',
-        'tanggal_serah', // tambahkan field baru
+        'tanggal_serah', 
     ];
 
     protected $casts = [
@@ -40,13 +40,13 @@ class Gaji extends Model
         return $this->belongsTo(Lembur::class, 'id_lembur', 'id_lembur');
     }
 
-    // Scope untuk gaji yang belum diserahkan
+    
     public function scopeBelumDiserahkan($query)
     {
         return $query->where('serahkan', 'belum');
     }
 
-    // Scope untuk gaji yang sudah diserahkan
+    
     public function scopeSudahDiserahkan($query)
     {
         return $query->where('serahkan', 'sudah');

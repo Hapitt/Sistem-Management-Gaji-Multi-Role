@@ -69,9 +69,8 @@
         </div>
     </div>
 
-    <!-- 2 CHART PURE TAILWIND CSS -->
+    <!-- 2 CHART -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- CHART KINERJA KARYAWAN (Bar Chart) -->
         <div class="bg-white rounded-lg shadow-md border border-gray-200">
             <div class="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
                 <div class="flex items-center">
@@ -82,7 +81,7 @@
                 </div>
             </div>
             <div class="p-6">
-                <!-- Bar Chart Vertical dengan Tailwind -->
+                <!-- Bar Chart Vertical -->
                 <div class="flex items-end justify-between h-64 space-x-2">
                     @php
                         $kinerjaData = [80, 75, 82, 80, 85, 88, 90, 80, 92, 95];

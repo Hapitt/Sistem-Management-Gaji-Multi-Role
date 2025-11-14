@@ -20,17 +20,17 @@ class GajiController extends Controller
         $search = $request->input('search');
         $periode = $request->input('periode');
 
-        // Ambil user_id dari user yang login
+
         $userId = Auth::id();
 
-        // Query gaji hanya untuk karyawan yang login dan sudah diserahkan
+
         $gaji = Gaji::with(['karyawan', 'lembur'])
             ->whereHas('karyawan', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
-            ->where('serahkan', 'sudah') // Hanya gaji yang sudah diserahkan
+            ->where('serahkan', 'sudah') 
             ->when($search, function ($query) use ($search) {
-                // Search by periode format
+
                 $query->where('periode', 'like', "%{$search}%");
             })
             ->when($periode, function ($query, $periode) {
@@ -51,7 +51,7 @@ class GajiController extends Controller
 
         $gaji = Gaji::with(['karyawan.jabatan', 'karyawan.rating', 'lembur'])
             ->where('id_gaji', $id)
-            ->where('serahkan', 'sudah') // Hanya yang sudah diserahkan
+            ->where('serahkan', 'sudah') 
             ->whereHas('karyawan', function ($query) use ($userId) {
                 $query->where('user_id', $userId);
             })
@@ -74,10 +74,10 @@ class GajiController extends Controller
             })
             ->firstOrFail();
 
-        // Buat PDF dari view
+
         $pdf = Pdf::loadView('karyawan.gaji.cetak', compact('gaji'));
 
-        // Download otomatis dengan nama file tertentu
+
         return $pdf->download('Slip_Gaji_' . $gaji->karyawan->nama . '.pdf');
     }
 }

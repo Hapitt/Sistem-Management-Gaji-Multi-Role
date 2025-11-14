@@ -37,7 +37,7 @@ class GajiController extends Controller
         return view('admin.gaji.index', compact('gaji', 'search', 'periode', 'filterSerah'));
     }
 
-    // ✅ TAMBAHKAN METHOD SHOW INI
+    
     public function show($id)
     {
         $gaji = Gaji::with(['karyawan.jabatan', 'karyawan.rating', 'lembur'])->findOrFail($id);
@@ -189,19 +189,19 @@ class GajiController extends Controller
     {
         $gaji = Gaji::with('karyawan')->findOrFail($id);
 
-        // Cek apakah gaji sudah diserahkan
+        
         if ($gaji->serahkan === 'sudah') {
             return redirect()->route('admin.gaji.index')
                 ->with('error', 'Gaji ini sudah diserahkan sebelumnya.');
         }
 
-        // Update status serahkan
+        
         $gaji->update([
             'serahkan' => 'sudah',
             'tanggal_serah' => now(),
         ]);
 
-        // TODO: Di sini nanti bisa ditambahkan pengiriman email/notifikasi ke karyawan
+        
 
         return redirect()->route('admin.gaji.index')
             ->with('success', 'Struk gaji berhasil diserahkan kepada ' . $gaji->karyawan->nama);
@@ -210,13 +210,13 @@ class GajiController extends Controller
     public function checkPeriod(Request $request)
     {
         try {
-            // Validasi input
+            
             $validated = $request->validate([
                 'karyawan_id' => 'required|exists:karyawan,id_karyawan',
                 'periode' => 'required|date',
             ]);
 
-            // Cek apakah sudah ada gaji untuk karyawan dan periode yang sama
+            
             $exists = Gaji::where('id_karyawan', $validated['karyawan_id'])
                 ->whereDate('periode', $validated['periode'])
                 ->exists();

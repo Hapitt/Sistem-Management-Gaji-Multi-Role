@@ -23,7 +23,6 @@ Route::view('dashboard', 'dashboard')
 // =====================
 // 🔹 ROUTE ADMIN
 // =====================
-// routes/web.php
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
@@ -41,8 +40,6 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
 
     Route::resource('/users', \App\Http\Controllers\Admin\UserController::class);
 });
-
-
 
 // =====================
 // 🔹 ROUTE MANAGER

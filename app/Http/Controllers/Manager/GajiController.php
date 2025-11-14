@@ -24,16 +24,16 @@ class GajiController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
-        $periode = $request->input('periode'); // expect format YYYY-MM or YYYY-MM-DD
+        $periode = $request->input('periode'); 
         $filterSerah = $request->input('serah');
 
-        // Ambil divisi manager yang sedang login (pakai optional agar tidak error)
+        
         $user = Auth::user();
         $managerDivisi = optional($user->karyawan)->divisi;
 
-        // Jika manager belum punya data karyawan, tampilkan kosong (atau bisa redirect dengan pesan)
+        
         if (!$managerDivisi) {
-            $gaji = Gaji::whereRaw('0 = 1')->paginate(10); // kosong
+            $gaji = Gaji::whereRaw('0 = 1')->paginate(10); 
             return view('manager.gaji.index', compact('gaji', 'search', 'periode', 'filterSerah', 'managerDivisi'));
         }
 
@@ -47,12 +47,12 @@ class GajiController extends Controller
                 });
             })
             ->when($periode, function ($q) use ($periode) {
-                // dukung input yyyy-mm atau yyyy-mm-dd
+                
                 try {
                     $dt = Carbon::parse(strlen($periode) === 7 ? $periode . '-01' : $periode);
                     $q->whereMonth('periode', $dt->month)->whereYear('periode', $dt->year);
                 } catch (\Exception $e) {
-                    // jika parse gagal, abaikan filter periode
+                    
                 }
             })
             ->when($filterSerah, function ($q) use ($filterSerah) {
@@ -88,7 +88,7 @@ class GajiController extends Controller
             return redirect()->route('manager.gaji.index')->with('error', 'Anda belum terhubung ke data karyawan. Hubungi admin.');
         }
 
-        // Ambil karyawan se-divisi, kecuali manager sendiri
+        
         $karyawan = Karyawan::where('divisi', $managerDivisi)
             ->when($managerId, fn($q) => $q->where('id_karyawan', '!=', $managerId))
             ->get();
@@ -121,7 +121,7 @@ class GajiController extends Controller
             return back()->withInput()->withErrors(['id_karyawan' => 'Anda tidak dapat menambah gaji untuk diri sendiri.']);
         }
 
-        // Parse periode ke Carbon dan ambil month/year
+       
         try {
             $periodeInput = $request->periode;
             $dt = Carbon::parse(strlen($periodeInput) === 7 ? $periodeInput . '-01' : $periodeInput);
@@ -129,7 +129,7 @@ class GajiController extends Controller
             return back()->withInput()->withErrors(['periode' => 'Format periode tidak valid. Gunakan YYYY-MM.']);
         }
 
-        // cek apakah sudah ada gaji di bulan & tahun yang sama
+        
         $exists = Gaji::where('id_karyawan', $request->id_karyawan)
             ->whereMonth('periode', $dt->month)
             ->whereYear('periode', $dt->year)
@@ -141,7 +141,7 @@ class GajiController extends Controller
 
         DB::beginTransaction();
         try {
-            // ambil data jabatan + rating via query join
+            
             $karyawanData = DB::table('karyawan')
                 ->join('jabatan', 'karyawan.id_jabatan', '=', 'jabatan.id_jabatan')
                 ->join('rating', 'karyawan.id_rating', '=', 'rating.id_rating')
@@ -166,7 +166,7 @@ class GajiController extends Controller
             $total_tunjangan = $tunjangan;
             $total_pendapatan = $gaji_pokok + $total_lembur + $total_bonus + $total_tunjangan;
 
-            // simpan, set periode sebagai first day of month
+
             Gaji::create([
                 'id_karyawan' => $request->id_karyawan,
                 'id_lembur' => $request->id_lembur,

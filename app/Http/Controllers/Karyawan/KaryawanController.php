@@ -30,7 +30,7 @@ class KaryawanController extends Controller
                 ->orWhere('alamat', 'like', "%{$search}%"))
             ->when($filterJabatan, fn($q) => $q->where('id_jabatan', $filterJabatan))
             ->when($filterRating, fn($q) => $q->where('id_rating', $filterRating))
-            ->where('status', 'Aktif') // Hanya menampilkan karyawan aktif
+            ->where('status', 'Aktif')
             ->orderBy('nama', 'asc')
             ->paginate(10)
             ->withQueryString();
