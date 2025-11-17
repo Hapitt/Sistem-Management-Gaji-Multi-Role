@@ -1,8 +1,9 @@
 <div class="flex items-center space-x-2">
     <!-- Logo kamu -->
-    <img src="{{ asset('images/logo.png') }}" 
-         alt="Logo Management Gaji" 
-         class="w-8 h-8 rounded-md object-cover">
+    <img src="{{ Vite::asset('resources/images/Logo.png') }}"
+     alt="Logo Management Gaji"
+     class="w-8 h-8 rounded-md object-cover">
+
 
     <!-- Nama aplikasi -->
     <div class="flex flex-col text-sm">
