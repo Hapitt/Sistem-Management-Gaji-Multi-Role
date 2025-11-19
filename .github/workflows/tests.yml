@@ -2,27 +2,28 @@ name: tests
 
 on:
   push:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
   pull_request:
-    branches: [develop, main]
+    branches:
+      - develop
+      - main
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    environment: Testing
 
     services:
       mysql:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: testing
+          MYSQL_DATABASE: multi-auth
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=3
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
 
     steps:
       - name: Checkout
@@ -31,10 +32,10 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.2
-          extensions: mbstring, pdo, pdo_mysql
+          php-version: 8.4
           tools: composer:v2
           coverage: xdebug
+          extensions: mysql, pdo_mysql, mbstring, xml, ctype, iconv, intl, json
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -43,25 +44,25 @@ jobs:
           cache: 'npm'
 
       - name: Install Node Dependencies
-        run: npm install
+        run: npm i
 
-      - name: Install Composer Dependencies
+      - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Copy Environment
+      - name: Copy Environment File
         run: cp .env.example .env
 
-      - name: Update DB Config
-        run: |
-          echo "DB_CONNECTION=mysql" >> .env
-          echo "DB_HOST=127.0.0.1" >> .env
-          echo "DB_PORT=3306" >> .env
-          echo "DB_DATABASE=testing" >> .env
-          echo "DB_USERNAME=root" >> .env
-          echo "DB_PASSWORD=root" >> .env
-
-      - name: Generate App Key
+      - name: Generate Application Key
         run: php artisan key:generate
+
+      - name: Build Assets
+        run: npm run build
+
+      - name: Wait for MySQL to be ready
+        run: |
+          while ! mysqladmin ping -h"127.0.0.1" -uroot -proot --silent; do
+            sleep 1
+          done
 
       - name: Run Migrations
         run: php artisan migrate --force
